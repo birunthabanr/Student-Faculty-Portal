@@ -9,6 +9,8 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { BookOpen, Calendar, GraduationCap, Library, Settings, User } from "lucide-react";
 import { SidebarTrigger } from "./ui/sidebar-trigger";
+import NotificationsSystem from './NotificationSystem';
+import AttendancePage from '../pages/attendance';
 
 interface Course {
   id: number;
@@ -141,6 +143,10 @@ const StudentDashboard: React.FC = () => {
         return <Grades />;
       case "profile":
         return <Profile />;
+      case "notifications":
+        return <NotificationsSystem/>
+      case "attendance":
+        return <AttendancePage/>
       default:
         return <Courses />;
     }
@@ -204,6 +210,28 @@ const StudentDashboard: React.FC = () => {
           >
             <User className="h-5 w-5" />
             <span>Profile</span>
+          </button>
+          <button
+            onClick={() => setActiveSection("attendance")}
+            className={`w-full flex items-center gap-2 px-4 py-2 rounded-md ${
+              activeSection === "attendance"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-accent"
+            }`}
+          >
+            <BookOpen className="h-5 w-5" />
+            <span>Attendance</span>
+          </button>
+          <button
+            onClick={() => setActiveSection("notifications")}
+            className={`w-full flex items-center gap-2 px-4 py-2 rounded-md ${
+              activeSection === "notifications"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-accent"
+            }`}
+          >
+            <BookOpen className="h-5 w-5" />
+            <span>Notifications</span>
           </button>
         </nav>
       </aside>
