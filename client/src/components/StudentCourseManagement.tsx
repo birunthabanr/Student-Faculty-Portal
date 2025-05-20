@@ -393,7 +393,7 @@ const StudentCourseManagement = () => {
                     <CardFooter className="border-t border-gray-700 pt-4">
                       <Button 
                         variant="outline"
-                        className="w-full border-gray-700 hover:bg-gray-700 text-gray-300"
+                        className="w-full bg-gray-900 text-gray-300 border-gray-500 hover:bg-gray-500 hover:text-white"
                       >
                         View Course Details
                       </Button>

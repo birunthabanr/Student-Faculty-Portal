@@ -882,28 +882,28 @@ const AcademicPerformance = () => {
 
   // Function to get grade letter
   const getGradeLetter = (score: number): string => {
-    if (score >= 90) return "A";
-    if (score >= 80) return "B";
-    if (score >= 70) return "C";
-    if (score >= 60) return "D";
+    if (score >= 75) return "A";
+    if (score >= 65) return "B";
+    if (score >= 55) return "C";
+    if (score >= 45) return "D";
     return "F";
   };
   
   // Function to get grade color
   const getGradeColor = (score: number): string => {
-    if (score >= 90) return "text-green-400";
-    if (score >= 80) return "text-blue-400";
-    if (score >= 70) return "text-yellow-400";
-    if (score >= 60) return "text-orange-400";
+    if (score >= 75) return "text-green-400";
+    if (score >= 65) return "text-blue-400";
+    if (score >= 55) return "text-yellow-400";
+    if (score >= 45) return "text-orange-400";
     return "text-red-400";
   };
 
   // Function to get background color class based on score
   const getBgColor = (score: number): string => {
-    if (score >= 90) return "bg-green-500";
-    if (score >= 80) return "bg-blue-500";
-    if (score >= 70) return "bg-yellow-500";
-    if (score >= 60) return "bg-orange-500";
+    if (score >= 75) return "bg-green-500";
+    if (score >= 65) return "bg-blue-500";
+    if (score >= 55) return "bg-yellow-500";
+    if (score >= 45) return "bg-orange-500";
     return "bg-red-500";
   };
 
@@ -1066,7 +1066,7 @@ const AcademicPerformance = () => {
                 <CardFooter className="border-t border-gray-700 pt-4">
                   <Button 
                     variant="outline"
-                    className="w-full border-gray-700 hover:bg-gray-700 text-gray-300"
+                    className="w-full bg-gray-900 text-gray-300 border-gray-500 hover:bg-gray-500 hover:text-white"
                     onClick={() => {
                       setSelectedCourse(course.course_name);
                       setActiveTab("recommendations");
