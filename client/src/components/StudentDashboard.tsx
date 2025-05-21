@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback} from "react"
 import { useNavigate } from "react-router-dom"
+import Webcam from "react-webcam";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Button } from "./ui/button"
@@ -22,6 +23,8 @@ import {
   AlertCircle,
   Search,
   Camera,
+  Check,
+  Upload
 } from "lucide-react"
 import Scheduler from "./Scheduler"
 import ResourceManagement from "./ResourceManagement"
@@ -72,94 +75,122 @@ interface AttendanceRecord {
   course_code?: string
 }
 
+
+// Define TypeScript interfaces
+interface PopupMessage {
+  type: "success" | "error";
+  text: string;
+}
+
+interface RegisterFaceResponse {
+  success: boolean;
+  message?: string;
+}
+
 // Facial Recognition Attendance Component
-const FacialRecognitionAttendance = () => {
-  const [isScanning, setIsScanning] = useState(false);
-  const [currentCourse, setCurrentCourse] = useState("");
-  const [currentLocation, setCurrentLocation] = useState("");
-  const [showPopup, setShowPopup] = useState(false);
-  const [popupMessage, setPopupMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
-  const [scanningStatus, setScanningStatus] = useState<"idle" | "scanning" | "processing">("idle");
-  const [detectedStudents, setDetectedStudents] = useState<{id: string, name: string, confidence: number}[]>([]);
 
-  useEffect(() => {
-    // Fetch recent attendance records
-    const mockRecords: AttendanceRecord[] = [
-      {
-        attendance_id: 1,
-        reg_number: "S12345",
-        timestamp: new Date().toISOString(),
-        method: "facial_recognition",
-        status: "present",
-        location: "Lecture Hall A",
-        course_code: "CS101",
-      },
-      {
-        attendance_id: 2,
-        reg_number: "S12346",
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        method: "facial_recognition",
-        status: "present",
-        location: "Lecture Hall B",
-        course_code: "CS102",
-      },
-      {
-        attendance_id: 3,
-        reg_number: "S12347",
-        timestamp: new Date(Date.now() - 7200000).toISOString(),
-        method: "facial_recognition",
-        status: "present",
-        location: "Lab 3",
-        course_code: "CS103",
-      },
-    ];
+  // API function for face registration
+const FaceRegistration: React.FC = () => {
+  const [mode, setMode] = useState<"upload" | "camera">("upload");
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [regNumber, setRegNumber] = useState<string>("");
+  const [showPopup, setShowPopup] = useState<boolean>(false);
+  const [popupMessage, setPopupMessage] = useState<PopupMessage | null>(null);
+  const webcamRef = useRef<WebcamRef | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    setRecentRecords(mockRecords);
-  }, []);
+  // API function for face registration
+  const registerFace = async (regNumber: string, imageBase64: string): Promise<RegisterFaceResponse> => {
+    try {
+      const backendUrl = "http://localhost:8006";
+      const response = await axios.post<RegisterFaceResponse>(
+        `${backendUrl}/attendance/register-face`,
+        {
+          reg_number: regNumber,
+          image_base64: imageBase64,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        (error as any).response?.data?.detail ||
+        (error as any).response?.data?.message ||
+        "Failed to register face. Please try again.";
+      throw new Error(errorMessage);
+    }
+  };
 
-  const startScanning = () => {
-    if (!currentCourse || !currentLocation) {
-      setPopupMessage({ type: "error", text: "Please select course and location" });
+  // Handle file upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event: ProgressEvent<FileReader>) => {
+        setImageSrc(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Capture photo from webcam
+  const capturePhoto = useCallback((): void => {
+    if (webcamRef.current) {
+      const screenshot = webcamRef.current.getScreenshot();
+      if (screenshot) {
+        setImageSrc(screenshot);
+      }
+    }
+  }, [webcamRef]);
+
+  // Reset image
+  const resetImage = (): void => {
+    setImageSrc(null);
+  };
+
+  // Submit registration
+  const handleSubmit = async (): Promise<void> => {
+    if (!imageSrc || !regNumber) {
+      setPopupMessage({ type: "error", text: "Please provide both a photo and registration number" });
       setShowPopup(true);
       return;
     }
 
-    setIsScanning(true);
-    setScanningStatus("scanning");
-    
-    // Simulate facial recognition process
-    setTimeout(() => {
-      setScanningStatus("processing");
-      // Simulate detected students
-      setDetectedStudents([
-        { id: "S12345", name: "John Doe", confidence: 0.98 },
-        { id: "S12346", name: "Jane Smith", confidence: 0.95 },
-        { id: "S12347", name: "Alex Johnson", confidence: 0.92 },
-      ]);
+    try {
+      setIsSubmitting(true);
+      const response = await registerFace(regNumber, imageSrc);
       
-      // Simulate completion
-      setTimeout(() => {
-        setScanningStatus("idle");
-        setIsScanning(false);
-        setPopupMessage({ type: "success", text: "Attendance recorded successfully" });
+      if (response.success) {
+        setPopupMessage({ type: "success", text: "Face registered successfully!" });
         setShowPopup(true);
-      }, 2000);
-    }, 3000);
+        setImageSrc(null);
+        setRegNumber("");
+      } else {
+        setPopupMessage({ type: "error", text: response.message || "Registration failed" });
+        setShowPopup(true);
+      }
+    } catch (error) {
+      setPopupMessage({ 
+        type: "error", 
+        text: error instanceof Error ? error.message : "Registration failed" 
+      });
+      setShowPopup(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
+  // Webcam component configuration
+  const videoConstraints = {
+    width: 720,
+    height: 720,
+    facingMode: "user" as const
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="max-w-4xl mx-auto p-4 bg-gray-900 min-h-screen text-white">
+      <h1 className="text-2xl font-bold text-center mb-6 text-white">Face Registration</h1>
+
       {/* Popup/Modal for success/error messages */}
       {showPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
@@ -181,147 +212,215 @@ const FacialRecognitionAttendance = () => {
             </div>
             <p className="text-white mb-5">{popupMessage?.text}</p>
             <div className="flex justify-end">
-              <Button 
+              <button 
                 onClick={() => setShowPopup(false)} 
-                className={`${
+                className={`px-4 py-2 rounded-md ${
                   popupMessage?.type === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
                 }`}
               >
                 Close
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <Card className="bg-gray-800 text-white border border-gray-700 overflow-hidden">
-        <CardHeader className="bg-gray-800 pb-3 pt-5 border-b border-gray-700">
-          <CardTitle className="text-white">Facial Recognition Attendance</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-300" htmlFor="course">
-                Select Course *
-              </label>
-              <Select value={currentCourse} onValueChange={setCurrentCourse} className="bg-gray-800 border-gray-700 text-white">
-                <SelectItem value="">Select a course</SelectItem>
-                <SelectItem value="CS101">CS101 - Introduction to Computer Science</SelectItem>
-                <SelectItem value="CS102">CS102 - Programming Fundamentals</SelectItem>
-                <SelectItem value="CS201">CS201 - Data Structures and Algorithms</SelectItem>
-                <SelectItem value="CS301">CS301 - Database Systems</SelectItem>
-              </Select>
+      <div className="bg-gray-800 rounded-lg shadow p-6 border border-gray-700">
+        {/* Mode Selection */}
+        <div className="flex justify-center mb-6">
+          <div className="bg-gray-700 p-1 rounded-lg inline-flex">
+            <button
+              onClick={() => {
+                setMode("upload");
+                setImageSrc(null);
+              }}
+              className={`px-4 py-2 rounded-md ${
+                mode === "upload" ? "bg-blue-600 text-white" : "text-gray-300"
+              }`}
+            >
+              <span className="flex items-center">
+                <Upload className="w-4 h-4 mr-2" />
+                Upload
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                setMode("camera");
+                setImageSrc(null);
+              }}
+              className={`px-4 py-2 rounded-md ${
+                mode === "camera" ? "bg-blue-600 text-white" : "text-gray-300"
+              }`}
+            >
+              <span className="flex items-center">
+                <Camera className="w-4 h-4 mr-2" />
+                Camera
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Left side: Image capture/upload */}
+          <div>
+            <h2 className="text-lg font-semibold mb-4 text-white">
+              {mode === "camera" ? "Capture Your Face" : "Upload Your Photo"}
+            </h2>
+
+            {/* Image display area */}
+            <div className="border-2 border-dashed border-gray-600 rounded-lg overflow-hidden mb-4 aspect-square flex items-center justify-center bg-gray-900">
+              {mode === "camera" ? (
+                !imageSrc ? (
+                  <div className="relative w-full h-full">
+                    {/* Actual webcam integration */}
+                    <Webcam
+                      audio={false}
+                      ref={webcamRef}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={videoConstraints}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <img
+                    src={imageSrc}
+                    alt="Captured"
+                    className="w-full h-full object-cover"
+                  />
+                )
+              ) : (
+                <>
+                  {imageSrc ? (
+                    <img
+                      src={imageSrc}
+                      alt="Uploaded"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full flex flex-col items-center justify-center cursor-pointer p-6"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-12 h-12 text-gray-400 mb-2" />
+                      <p className="text-gray-400 text-center">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        JPG, PNG, JPEG
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-300" htmlFor="location">
-                Location *
+            {/* Camera/Upload controls */}
+            <div className="flex justify-center gap-4">
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {mode === "camera" ? (
+                !imageSrc ? (
+                  <button
+                    onClick={capturePhoto}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center"
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Capture Photo
+                  </button>
+                ) : (
+                  <button
+                    onClick={resetImage}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md flex items-center"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Retake
+                  </button>
+                )
+              ) : (
+                <>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {imageSrc ? "Change Image" : "Select Image"}
+                  </button>
+                  {imageSrc && (
+                    <button
+                      onClick={resetImage}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Remove
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right side: Registration form */}
+          <div>
+            <h2 className="text-lg font-semibold mb-4 text-white">Registration Details</h2>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Registration Number <span className="text-red-500">*</span>
               </label>
-              <Input
-                id="location"
-                value={currentLocation}
-                onChange={(e) => setCurrentLocation(e.target.value)}
-                placeholder="e.g. Lecture Hall A"
-                className="bg-gray-800 border-gray-700 text-white"
+              <input
+                type="text"
+                value={regNumber}
+                onChange={(e) => setRegNumber(e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-700 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
+                placeholder="Enter your registration number"
                 required
               />
             </div>
 
-            <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
-              {isScanning ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  {scanningStatus === "scanning" ? (
-                    <>
-                      <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                      <p className="text-blue-400 font-medium">Scanning for faces...</p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                      <p className="text-green-400 font-medium">Processing detected faces...</p>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <Camera className="h-12 w-12 text-gray-600 mb-4" />
-                  <p className="text-gray-400">Camera feed will appear here</p>
-                </div>
-              )}
+            {/* Instructions */}
+            <div className="bg-gray-900 border border-gray-700 rounded-md p-4 mb-6">
+              <h3 className="font-semibold text-blue-400 mb-2">Instructions</h3>
+              <ul className="text-sm text-gray-300 space-y-1">
+                <li>• Make sure your face is clearly visible</li>
+                <li>• Remove glasses, hats, or face coverings</li>
+                <li>• Only one face should be visible</li>
+                <li>• Look directly at the camera</li>
+              </ul>
             </div>
 
-            {detectedStudents.length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                <h4 className="text-sm font-medium text-gray-300 mb-3">Detected Students</h4>
-                <div className="space-y-2">
-                  {detectedStudents.map((student) => (
-                    <div key={student.id} className="flex items-center justify-between bg-gray-800 p-2 rounded">
-                      <div>
-                        <p className="text-white font-medium">{student.name}</p>
-                        <p className="text-sm text-gray-400">{student.id}</p>
-                      </div>
-                      <div className="text-sm text-green-400">
-                        {Math.round(student.confidence * 100)}% match
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <Button 
-              onClick={startScanning} 
-              disabled={isScanning || !currentCourse || !currentLocation}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+            {/* Submit button */}
+            <button
+              onClick={handleSubmit}
+              disabled={!imageSrc || !regNumber || isSubmitting}
+              className={`w-full py-3 rounded-md font-medium flex items-center justify-center ${
+                !imageSrc || !regNumber || isSubmitting
+                  ? "bg-gray-600 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
             >
-              {isScanning ? "Processing..." : "Start Facial Recognition"}
-            </Button>
+              {isSubmitting ? (
+                <span>Registering...</span>
+              ) : (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Register Your Face
+                </>
+              )}
+            </button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-800 text-white border border-gray-700 overflow-hidden">
-        <CardHeader className="bg-gray-800 pb-3 pt-5 border-b border-gray-700">
-          <CardTitle className="text-white">Recent Attendance Records</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-700">
-                <tr className="border-b border-gray-700">
-                  <th className="text-left py-3 px-4 font-medium text-white">Reg #</th>
-                  <th className="text-left py-3 px-4 font-medium text-white">Course</th>
-                  <th className="text-left py-3 px-4 font-medium text-white">Method</th>
-                  <th className="text-left py-3 px-4 font-medium text-white">Location</th>
-                  <th className="text-left py-3 px-4 font-medium text-white">Time</th>
-                </tr>
-              </thead>
-              <tbody className="bg-gray-800">
-                {recentRecords.length > 0 ? (
-                  recentRecords.map((record) => (
-                    <tr key={record.attendance_id} className="border-b border-gray-700 hover:bg-gray-700">
-                      <td className="py-3 px-4 text-white">{record.reg_number}</td>
-                      <td className="py-3 px-4 text-white">{record.course_code}</td>
-                      <td className="py-3 px-4 text-white capitalize">{record.method.replace('_', ' ')}</td>
-                      <td className="py-3 px-4 text-white">{record.location}</td>
-                      <td className="py-3 px-4 text-gray-400">{formatDate(record.timestamp)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-center text-gray-500">
-                      No recent attendance records
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
+
+
 
 // Rename Students to Attendance
 const Attendance = () => {
@@ -644,7 +743,7 @@ const Attendance = () => {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="facial" className="mt-6 flex-1">
-          <FacialRecognitionAttendance />
+          {<FaceRegistration />}
         </TabsContent>
         <TabsContent value="reports" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
