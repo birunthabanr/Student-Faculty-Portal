@@ -94,7 +94,7 @@ const Login: React.FC = () => {
           
           <div className="px-8 py-4 bg-gray-900 text-center">
             <p className="text-gray-500 text-xs">
-              © 2023 Personalized Portal. All rights reserved.
+              © 2025 Personalized Portal. All rights reserved.
             </p>
           </div>
         </div>

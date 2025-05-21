@@ -27,6 +27,7 @@ import {
 import Scheduler from "./Scheduler"
 import ResourceManagement from "./ResourceManagementStudent"
 import StudentCourseManagement from "./StudentCourseManagement"
+import ChatBot from "./ChatBot"
 import API_CONFIG from "../lib/config"
 import axios from "axios"
 import { Badge } from "./ui/badge"
@@ -1352,6 +1353,9 @@ const StudentDashboard: React.FC = () => {
         <div className="flex-1 overflow-auto w-full h-full bg-gray-900 p-4">
           {renderActiveSection()}
         </div>
+        
+        {/* ChatBot component */}
+        <ChatBot portalType="student" userName={user?.name} />
       </div>
     </div>
   )
